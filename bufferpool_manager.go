@@ -8,44 +8,9 @@ import (
 const PAGE_SIZE = 16
 const INVALID_PAGE_ID int32 = -1
 
-type Page struct {
-	pageId   int32
-	pinCount int32
-	isDirty  bool
-	data     [PAGE_SIZE]byte
-}
 
-func (p *Page) GetData() [PAGE_SIZE]byte {
-	return p.data
-}
 
-func (p *Page) Reset() {
-	p.data = [PAGE_SIZE]byte{}
 
-}
-
-type DiskManager struct {
-	db string
-	pages map[int32][PAGE_SIZE]byte
-}
-
-func NewDiskManager(db string) *DiskManager {
-	return &DiskManager{db: db, pages: make(map[int32][PAGE_SIZE]byte)}
-}
-
-func (d *DiskManager) DeallocatePage(pageId int32) {
-	delete(d.pages, pageId)
-}
-
-func (d *DiskManager) WritePage(id int32, b [PAGE_SIZE]byte) {
-	d.pages[id] = b
-
-}
-
-func (d *DiskManager) ReadPage(pageId int32, data *[PAGE_SIZE]byte) {
-	*data = d.pages[pageId]
-
-}
 
 type BufferPoolManager struct {
 	Pages         []Page

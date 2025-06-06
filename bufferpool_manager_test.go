@@ -49,7 +49,7 @@ func TestBufferpool(t *testing.T) {
 
 	dd = page_zero.GetData()
 	fmt.Println(string(dd[:n]))
-	fmt.Println(bpm.diskm.pages[0])
+	bpm.diskm.Close()
 
 }
 

@@ -18,3 +18,13 @@ func (p *Page) Reset() {
 		p.data[i] = 0
 	}
 }
+
+
+func (p *Page) Write(data []byte) {
+	for i:=0;i<len(data);i++ {
+			p.data[i] = data[i]
+	}
+	// for i:=0;i<PAGE_SIZE;i++ {
+	// 	p.data[i] = 0
+	// }
+}

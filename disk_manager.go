@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"container/list"
 	"os"
 )
 
@@ -11,6 +11,7 @@ type DiskManager struct {
 	// pages map[int32][PAGE_SIZE]byte
 	page map[int32]int32
 	fd *os.File
+	freeSlot *list.List
 }
 
 func NewDiskManager(db string) *DiskManager {
@@ -22,6 +23,7 @@ func NewDiskManager(db string) *DiskManager {
 	return &DiskManager{db: db, 
 		page: make(map[int32]int32),
 		fd: fd,
+		freeSlot: list.New(),
 	}
 }
 
@@ -41,6 +43,12 @@ func (d *DiskManager) WritePage(id int32, b [PAGE_SIZE]byte) {
 }
 
 func (d *DiskManager) AllocatePage() int32 {
+	if d.freeSlot.Len() > 0 {
+		node := d.freeSlot.Front()
+		offset := node.Value.(int32)
+		d.freeSlot.Remove(node)
+		return offset
+	}
 	return int32(len(d.page) * PAGE_SIZE)
 
 }
@@ -55,22 +63,27 @@ func (d *DiskManager) ReadPage(pageId int32, data *[PAGE_SIZE]byte) {
 		return
 
 	}
-	fmt.Println(d.page, offset)
-	b := make([]byte, 0)
+	b := make([]byte, PAGE_SIZE)
 	n, err := d.fd.ReadAt(b, int64(offset))
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(string(b))
 	for i:=0;i<n;i++ {
 		(*data)[i] = b[i]
 	}
+	// d.fd.Seek(0,0)
 	//*data = d.pages[pageId]
 
 }
 
 func (d *DiskManager) DeallocatePage(pageId int32) {
-	panic("not impl")
+	offset,find := d.page[pageId]
+	if !find {
+		// 表示这个page 没新建过，或者已经被删除了
+		return 
+	}
+	d.freeSlot.PushBack(offset)
+	delete(d.page, pageId)
 }
 
 func (d *DiskManager) Close() {

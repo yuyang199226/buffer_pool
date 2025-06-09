@@ -216,7 +216,6 @@ func (bpm *BufferPoolManager) FlushPageImpl(pageId int32) bool {
 }
 
 func (bpm *BufferPoolManager) AllocatePage() int32 {
-
 	nextPageId := bpm.nextPageId
 	bpm.nextPageId++
 	return nextPageId

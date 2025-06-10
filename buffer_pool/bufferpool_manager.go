@@ -1,29 +1,31 @@
-package main
+package bufferpool_manager
 
 import (
 	"container/list"
 	"fmt"
+	"bufferpool/conf"
+	"bufferpool/disk"
+	"bufferpool/page"
 )
 
-const PAGE_SIZE = 16
-const INVALID_PAGE_ID int32 = -1
+
 
 
 
 
 
 type BufferPoolManager struct {
-	Pages         []Page
+	Pages         []page.Page
 	PageTable     map[int32]int32
 	FreeFrameList *list.List
-	diskm         *DiskManager
+	diskm         *disk.DiskManager
 	replacer      *LruReplacer
 	nextPageId    int32
 }
 
-func NewBufferPoolManager(poolSize int, diskManager *DiskManager) *BufferPoolManager {
+func NewBufferPoolManager(poolSize int, diskManager *disk.DiskManager) *BufferPoolManager {
 	bpm := new(BufferPoolManager)
-	bpm.Pages = make([]Page, poolSize)
+	bpm.Pages = make([]page.Page, poolSize)
 	bpm.PageTable = make(map[int32]int32)
 	bpm.FreeFrameList = list.New()
 	bpm.diskm = diskManager
@@ -35,17 +37,17 @@ func NewBufferPoolManager(poolSize int, diskManager *DiskManager) *BufferPoolMan
 	return bpm
 }
 
-func (bpm *BufferPoolManager) FetchPageImpl(pageId int32) *Page {
+func (bpm *BufferPoolManager) FetchPageImpl(pageId int32) *page.Page {
 	frameid, find := bpm.PageTable[pageId]
 	if find {
-		bpm.Pages[frameid].pinCount++
+		bpm.Pages[frameid].PinCount++
 		bpm.replacer.Pin(frameid)
 		return &bpm.Pages[frameid]
 	}
 	// 如果bufferpool 里的page 都有人在用，那就不能从disk 加载了，所以返回nil
 	usedPage := 0
 	for i := 0; i < len(bpm.Pages); i++ {
-		if bpm.Pages[i].pinCount >= 1 {
+		if bpm.Pages[i].PinCount >= 1 {
 			usedPage++
 		}
 	}
@@ -70,26 +72,26 @@ func (bpm *BufferPoolManager) FetchPageImpl(pageId int32) *Page {
 		return nil
 	}
 	page := bpm.Pages[newFrameId]
-	if page.isDirty {
+	if page.IsDirty {
 		// 写回disk
-		bpm.FlushPageImpl(page.pageId)
+		bpm.FlushPageImpl(page.PageId)
 	}
 	bpm.PageTable[pageId] = newFrameId
 	bpm.replacer.Pin(newFrameId)
-	var data [PAGE_SIZE]byte
+	var data [conf.PAGE_SIZE]byte
 	bpm.diskm.ReadPage(pageId, &data)
-	bpm.Pages[newFrameId].pageId = pageId
-	bpm.Pages[newFrameId].pinCount = 1
-	bpm.Pages[newFrameId].isDirty = false
-	bpm.Pages[newFrameId].data = data
+	bpm.Pages[newFrameId].PageId = pageId
+	bpm.Pages[newFrameId].PinCount = 1
+	bpm.Pages[newFrameId].IsDirty = false
+	bpm.Pages[newFrameId].Write(data[:])
 	return &bpm.Pages[newFrameId]
 }
 
-func (bpm *BufferPoolManager) NewPageImpl(pageId *int32) *Page {
+func (bpm *BufferPoolManager) NewPageImpl(pageId *int32) *page.Page {
 	// 如果池子里的page 都有人在用,那没法新建了
 	usedPage := 0
 	for i := 0; i < len(bpm.Pages); i++ {
-		if bpm.Pages[i].pinCount >= 1 {
+		if bpm.Pages[i].PinCount >= 1 {
 			usedPage++
 		}
 	}
@@ -111,13 +113,13 @@ func (bpm *BufferPoolManager) NewPageImpl(pageId *int32) *Page {
 		if ok {
 			existFrame = true
 		}
-		if bpm.Pages[newFrameId].isDirty {
+		if bpm.Pages[newFrameId].IsDirty {
 		// 写回disk
-		bpm.FlushPageImpl(bpm.Pages[newFrameId].pageId)
+		bpm.FlushPageImpl(bpm.Pages[newFrameId].PageId)
 		}
-			if bpm.Pages[newFrameId].pageId != INVALID_PAGE_ID {
+			if bpm.Pages[newFrameId].PageId != conf.INVALID_PAGE_ID {
 
-		delete(bpm.PageTable, bpm.Pages[newFrameId].pageId)
+		delete(bpm.PageTable, bpm.Pages[newFrameId].PageId)
 	}
 	}
 	if !existFrame {
@@ -127,9 +129,9 @@ func (bpm *BufferPoolManager) NewPageImpl(pageId *int32) *Page {
 
 	*pageId = bpm.AllocatePage()
 	bpm.replacer.Pin(newFrameId)
-	bpm.Pages[newFrameId].pageId = *pageId
-	bpm.Pages[newFrameId].isDirty = false
-	bpm.Pages[newFrameId].pinCount = 1
+	bpm.Pages[newFrameId].PageId = *pageId
+	bpm.Pages[newFrameId].IsDirty = false
+	bpm.Pages[newFrameId].PinCount = 1
 	bpm.Pages[newFrameId].Reset()
 	bpm.PageTable[*pageId] = newFrameId
 	return &bpm.Pages[newFrameId]
@@ -149,13 +151,13 @@ func (bpm *BufferPoolManager) UnpinPageImpl(pageId int32, isDirty bool) bool {
 	}
 
 	page := &bpm.Pages[frameId]
-	if page.pinCount <= 0 {
+	if page.PinCount <= 0 {
 		return false
 	}
-	page.isDirty = isDirty
-	page.pinCount--
+	page.IsDirty = isDirty
+	page.PinCount--
 
-	if page.pinCount == 0 {
+	if page.PinCount == 0 {
 		bpm.replacer.Unpin(frameId)
 	}
 	return true
@@ -170,11 +172,11 @@ func (bpm *BufferPoolManager) DeletePageImpl(pageId int32) bool {
 		return true
 	}
 	page := bpm.Pages[frameId]
-	if page.pinCount > 0 {
+	if page.PinCount > 0 {
 		return false
 	}
-	page.pageId = INVALID_PAGE_ID
-	page.isDirty = false
+	page.PageId = conf.INVALID_PAGE_ID
+	page.IsDirty = false
 	page.Reset()
 	delete(bpm.PageTable, pageId)
 	bpm.FreeFrameList.PushBack(frameId)
@@ -185,16 +187,16 @@ func (bpm *BufferPoolManager) DeletePageImpl(pageId int32) bool {
 
 func (bpm *BufferPoolManager) FlushALlPageImpl(pageId int32) bool {
 	for i := 0; i < len(bpm.Pages); i++ {
-		bpm.FlushPageImpl(bpm.Pages[i].pageId)
+		bpm.FlushPageImpl(bpm.Pages[i].PageId)
 	}
 	frameId, find := bpm.PageTable[pageId]
 	if !find {
 		return false
 	}
 	page := bpm.Pages[frameId]
-	bpm.diskm.WritePage(page.pageId, page.GetData())
-	if page.isDirty {
-		page.isDirty = false
+	bpm.diskm.WritePage(page.PageId, page.GetData())
+	if page.IsDirty {
+		page.IsDirty = false
 	}
 	return true
 }
@@ -205,12 +207,12 @@ func (bpm *BufferPoolManager) FlushPageImpl(pageId int32) bool {
 	}
 	page := bpm.Pages[frameId]
 	// 表示已经是被删除了，所以不需要flush 了
-	if page.pageId == INVALID_PAGE_ID {
+	if page.PageId == conf.INVALID_PAGE_ID {
 		return false
 	}
-	bpm.diskm.WritePage(page.pageId, page.GetData())
-	if page.isDirty {
-		page.isDirty = false
+	bpm.diskm.WritePage(page.PageId, page.GetData())
+	if page.IsDirty {
+		page.IsDirty = false
 	}
 	return true
 }
@@ -224,11 +226,8 @@ func (bpm *BufferPoolManager) AllocatePage() int32 {
 
 func (bpm *BufferPoolManager) PrintPage() {
 	for _, v := range bpm.Pages {
-		fmt.Printf("pageid=%d, pincount=%d\n", v.pageId, v.pinCount)
+		fmt.Printf("pageid=%d, pincount=%d\n", v.PageId, v.PinCount)
 	}
 	fmt.Println(bpm.PageTable)
 }
 
-func main() {
-	fmt.Println("hello")
-}

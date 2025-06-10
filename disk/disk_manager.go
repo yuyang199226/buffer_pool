@@ -1,8 +1,9 @@
-package main
+package disk
 
 import (
 	"container/list"
 	"os"
+	"bufferpool/conf"
 )
 
 
@@ -28,7 +29,7 @@ func NewDiskManager(db string) *DiskManager {
 }
 
 
-func (d *DiskManager) WritePage(id int32, b [PAGE_SIZE]byte) {
+func (d *DiskManager) WritePage(id int32, b [conf.PAGE_SIZE]byte) {
 	offset,ok := d.page[id]
 	if !ok {
 		offset = d.AllocatePage()
@@ -49,7 +50,7 @@ func (d *DiskManager) AllocatePage() int32 {
 		d.freeSlot.Remove(node)
 		return offset
 	}
-	return int32(len(d.page) * PAGE_SIZE)
+	return int32(len(d.page) * conf.PAGE_SIZE)
 
 }
 
@@ -57,13 +58,13 @@ func (d *DiskManager) AllocatePage() int32 {
 
 
 
-func (d *DiskManager) ReadPage(pageId int32, data *[PAGE_SIZE]byte) {
+func (d *DiskManager) ReadPage(pageId int32, data *[conf.PAGE_SIZE]byte) {
 	offset,ok := d.page[pageId]
 	if !ok {
 		return
 
 	}
-	b := make([]byte, PAGE_SIZE)
+	b := make([]byte, conf.PAGE_SIZE)
 	n, err := d.fd.ReadAt(b, int64(offset))
 	if err != nil {
 		panic(err)

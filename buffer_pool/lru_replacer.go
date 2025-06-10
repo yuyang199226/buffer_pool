@@ -1,4 +1,4 @@
-package main
+package bufferpool_manager
 
 import (
 	"container/list"

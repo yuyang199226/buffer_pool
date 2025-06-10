@@ -1,6 +1,7 @@
-package main
+package bufferpool_manager
 
 import (
+	"bufferpool/disk"
 	"fmt"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 func TestBufferpool(t *testing.T) {
 	assert := assert.New(t)
 	var temp_page_id_t int32
-	dm := NewDiskManager("test.db")
+	dm := disk.NewDiskManager("test.db")
 	bpm := NewBufferPoolManager(10, dm)
 	page_zero := bpm.NewPageImpl(&temp_page_id_t)
 	assert.Equal(int32(0), temp_page_id_t, "should be equal")
@@ -54,7 +55,7 @@ func TestBufferpool(t *testing.T) {
 func TestBufferpool2(t *testing.T) {
 	assert := assert.New(t)
 	var temp_page_id_t int32
-	dm := NewDiskManager("test.db")
+	dm := disk.NewDiskManager("test.db")
 	bpm := NewBufferPoolManager(10, dm)
 	page_zero := bpm.NewPageImpl(&temp_page_id_t)
 	assert.Equal(int32(0), temp_page_id_t, "should be equal")
@@ -91,7 +92,7 @@ func TestBufferpool2(t *testing.T) {
 			t.Logf("v = %d false nil",v)
 			return
 		}
-		assert.Equal(v, page.pageId)
+		assert.Equal(v, page.PageId)
 		bpm.UnpinPageImpl(v, true)
 	}
 

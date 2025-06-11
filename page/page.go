@@ -107,6 +107,6 @@ func (p *HashTableDirectoryPage) IncrGlobalDepth() {
 }
 
 func (p *HashTableDirectoryPage) Size() uint32 {
-	return 0
+	return 1 << p.globalDepth
 }
 
